@@ -11,15 +11,15 @@ Octopus MCP is the pluggable tool execution engine for **ALFRED**, implementing 
    - Provides a strictly synchronous API for ALFRED (`bridge.route_and_execute(query)` / `bridge.call_tool(name, args)`).
    - Keeps ALFRED synchronous, fast, and free of async loop complications.
 
-2. **Dual-Mode Routing (Strategy B)**:
+2. **Dual-Mode Routing**:
    - **Step 1 (Fast-Path)**: Sub-1ms regex & keyword router checks obvious tool intents (`volume`, `search`, `open app`).
-   - **Step 2 (Quantized Classifier)**: Optional Qwen 4-bit / TurboQuant classifier (~200MB RAM, <30ms latency) for speech argument parsing.
+   - **Step 2 (Quantized Classifier)**: Optional Qwen 4-bit / TurboQuant classifier (<30ms latency) for speech argument parsing.
    - **Step 3 (Graceful Fallback)**: If no tool matches or if a tool fails, returns `{"handled": False}`, cascading query to ALFRED's main LLM.
 
 3. **Subprocess Pooling & Active Memory Management**:
    - External GitHub MCP servers run over **stdio** (Node.js / Python).
    - Injected Node memory cap: `--max-old-space-size=64`.
-   - **60-Second Idle Retirement**: Automatically terminates idle child processes and invokes `gc.collect()` to return ~200MB RAM to the OS.
+   - **60-Second Idle Retirement**: Automatically terminates idle child processes and invokes `gc.collect()` to return RAM to the OS.
    - **orjson Serialization**: Lightning-fast JSON-RPC 2.0 communication.
 
 ---
@@ -34,7 +34,7 @@ FmWk/
 │   ├── client.py          # Fast orjson Stdio MCP Client with memory caps & idle timer
 │   ├── config.py          # Configuration and path management
 │   ├── decorators.py      # @mcp_tool decorator for native in-process tools
-│   ├── keyword_router.py  # Strategy B regex fast-path matcher
+│   ├── keyword_router.py  # Regex fast-path matcher
 │   └── qwen_classifier.py # Qwen 4-bit quantized classifier interface
 ├── tools/                 # Native in-process Python tools (<0.5ms)
 │   ├── system_tools.py    # Volume and application launcher
@@ -53,7 +53,7 @@ Open `FmWk/mcp_servers.json` and add your tool definition under `mcpServers`:
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\VIBHA\\Desktop"],
+      "args": ["-y", "@modelcontextprotocol/server-filesystem", "C:\\Users\\%USERPROFILE%\\Desktop"],
       "enabled": true
     }
   }

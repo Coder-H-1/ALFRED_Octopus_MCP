@@ -28,7 +28,7 @@ APP_MAP = {
     "whatsapp": "start chrome https://web.whatsapp.com",
     "facebook": "start chrome https://facebook.com",
     "twitter": "start chrome https://twitter.com",
-    "linkedin": "start chrome https://linkedin.com"
+    "linkedin": "start chrome https://linkedin.com", 
 }
 
 _volume_interface = None

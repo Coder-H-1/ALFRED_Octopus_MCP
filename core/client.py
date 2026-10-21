@@ -8,8 +8,18 @@ import gc
 import time
 import subprocess
 import threading
-from typing import Dict, Any, List, Optional
-import orjson
+try:
+    import orjson
+except ImportError:
+    import json
+    class _OrjsonCompat:
+        @staticmethod
+        def dumps(obj):
+            return json.dumps(obj).encode('utf-8')
+        @staticmethod
+        def loads(b):
+            return json.loads(b)
+    orjson = _OrjsonCompat()
 
 from .config import get_settings
 

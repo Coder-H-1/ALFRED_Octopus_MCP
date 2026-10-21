@@ -4,7 +4,18 @@ FmWk/core/qwen_classifier.py — Warm Resident LLM Tool Classifier for Natural V
 
 import os
 from typing import Dict, Any, List, Optional
-import orjson
+try:
+    import orjson
+except ImportError:
+    import json
+    class _OrjsonCompat:
+        @staticmethod
+        def dumps(obj):
+            return json.dumps(obj).encode('utf-8')
+        @staticmethod
+        def loads(b):
+            return json.loads(b)
+    orjson = _OrjsonCompat()
 from FILES.logger import get_logger
 
 logger = get_logger(__name__)

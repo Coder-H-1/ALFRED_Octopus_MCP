@@ -65,7 +65,7 @@ def window_move(window_name: str, x: int, y: int) -> Dict[str, Any]:
 
 @mcp_tool(
     name="window_manage_state",
-    description="Change window state: 'minimize', 'maximize', or 'restore'.",
+    description="Change window state: 'minimise', 'maximise', or 'restore'.",
     category="window"
 )
 def window_manage_state(window_name: str, action: str) -> Dict[str, Any]:
@@ -88,7 +88,7 @@ def window_manage_state(window_name: str, action: str) -> Dict[str, Any]:
             win32gui.ShowWindow(hwnd, win32con.SW_RESTORE)
             return {"status": f"Restored {win.title}, sir."}
         else:
-            return {"error": f"Unknown window action '{action}'. Use minimize, maximize, or restore."}
+            return {"error": f"Unknown window action '{action}'. Use minimise, maximise, or restore."}
     except Exception as e:
         return {"error": f"Failed to adjust window state: {e}"}
 
