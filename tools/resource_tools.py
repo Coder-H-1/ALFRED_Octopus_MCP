@@ -1,5 +1,5 @@
 """
-FmWk/tools/resource_tools.py — Native In-Process Resource Monitoring Tools
+MCP/tools/resource_tools.py — Native In-Process Resource Monitoring Tools
 """
 
 import os

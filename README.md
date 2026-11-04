@@ -1,4 +1,4 @@
-# FmWk: Octopus MCP (Model Context Protocol)
+# MCP: Octopus Model Context Protocol
 
 Octopus MCP is the pluggable tool execution engine for **ALFRED**, implementing Anthropic's Model Context Protocol (MCP) standard.
 
@@ -6,7 +6,7 @@ Octopus MCP is the pluggable tool execution engine for **ALFRED**, implementing 
 
 ## Architecture Overview
 
-1. **Intermediary Bridge (`FmWk/bridge.py`)**:
+1. **Intermediary Bridge (`MCP/bridge.py`)**:
    - Manages an isolated `asyncio` event loop in a daemon thread.
    - Provides a strictly synchronous API for ALFRED (`bridge.route_and_execute(query)` / `bridge.call_tool(name, args)`).
    - Keeps ALFRED synchronous, fast, and free of async loop complications.
@@ -27,7 +27,7 @@ Octopus MCP is the pluggable tool execution engine for **ALFRED**, implementing 
 ## Directory Structure
 
 ```
-FmWk/
+MCP/
 ├── bridge.py              # Intermediary Sync-Async Bridge for ALFRED
 ├── mcp_servers.json       # Config registry for external GitHub stdio servers
 ├── core/
@@ -46,7 +46,7 @@ FmWk/
 
 ## Adding External MCP Tools from GitHub
 
-Open `FmWk/mcp_servers.json` and add your tool definition under `mcpServers`:
+Open `MCP/mcp_servers.json` and add your tool definition under `mcpServers`:
 
 ```json
 {

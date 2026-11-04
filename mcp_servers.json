@@ -1,11 +1,21 @@
 {
   "_comment": "Octopus MCP Server Registry. External GitHub tools run via stdio with Node memory cap and 60s idle retirement.",
   "settings": {
-    "node_max_old_space_size_mb": 256,
+    "node_max_old_space_size_mb": 512,
     "idle_timeout_seconds": 120,
     "aggressive_gc": true
   },
   "mcpServers": {
+    "researcher": {
+      "command": "py",
+      "args": [
+        "-3.14",
+        "server.py"
+      ],
+      "cwd": "Researcher",
+      "enabled": true,
+      "description": "Standalone deep research MCP server with Obsidian vault and reports"
+    },
     "filesystem": {
       "command": "npx",
       "args": [
@@ -60,7 +70,7 @@
         "-y",
         "@shinzolabs/gmail-mcp"
       ],
-      "enabled": true,
+      "enabled": false,
       "description": "Gmail MCP server for searching, reading, drafting, and sending emails"
     }
   }

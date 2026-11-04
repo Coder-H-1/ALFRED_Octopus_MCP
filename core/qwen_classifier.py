@@ -1,5 +1,5 @@
 """
-FmWk/core/qwen_classifier.py — Warm Resident LLM Tool Classifier for Natural Voice Queries
+MCP/core/qwen_classifier.py — Warm Resident LLM Tool Classifier for Natural Voice Queries
 """
 
 import os
@@ -20,8 +20,8 @@ from FILES.logger import get_logger
 
 logger = get_logger(__name__)
 
-_FMWK_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-_DEFAULT_MODEL_PATH = os.path.join(_FMWK_DIR, "models", "qwen.gguf")
+_MCP_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_DEFAULT_MODEL_PATH = os.path.join(_MCP_DIR, "models", "qwen.gguf")
 
 
 def _extract_first_json(text: str) -> Optional[dict]:
@@ -88,8 +88,8 @@ class QwenToolClassifier:
 
         # 2. Fallback to ALFRED's warm resident LLM instance
         try:
-            from FILES.utils import LLM
-            self._llm = LLM
+            from FILES.utils import get_llm
+            self._llm = get_llm()
             self._warm = True
             logger.info("Hooked into ALFRED warm resident LLM instance for tool classification.")
         except Exception as e:

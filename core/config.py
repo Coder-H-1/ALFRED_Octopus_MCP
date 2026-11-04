@@ -1,11 +1,11 @@
 """
-FmWk/core/config.py — Configuration and Path Settings for Octopus MCP
+MCP/core/config.py — Configuration and Path Settings for Octopus MCP
 """
 
 import os
 from typing import Dict, Any
 
-_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # FmWk/
+_BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__))) # MCP/
 _CONFIG_FILE = os.path.join(_BASE_DIR, "mcp_servers.json")
 _TOOLS_DIR = os.path.join(_BASE_DIR, "tools")
 

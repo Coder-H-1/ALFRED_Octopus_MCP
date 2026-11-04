@@ -1,5 +1,5 @@
 """
-FmWk/core/client.py — High-Performance Stdio MCP Client with orjson and Memory Management
+MCP/core/client.py — High-Performance Stdio MCP Client with orjson and Memory Management
 """
 
 import os
@@ -34,11 +34,12 @@ class StdioMCPClient:
     - gc.collect() on process retirement
     """
 
-    def __init__(self, name: str, command: str, args: List[str], env: Optional[Dict[str, str]] = None):
+    def __init__(self, name: str, command: str, args: List[str], env: Optional[Dict[str, str]] = None, cwd: Optional[str] = None):
         self.name = name
         self.base_command = command
         self.base_args = list(args)
         self.env = env or os.environ.copy()
+        self.cwd = os.path.abspath(cwd) if cwd else None
         
         settings = get_settings()
         self.idle_timeout = settings.get("idle_timeout_seconds", 120)
@@ -86,6 +87,7 @@ class StdioMCPClient:
                 stdout=subprocess.PIPE,
                 stderr=subprocess.PIPE,
                 env=self.env,
+                cwd=self.cwd,
                 bufsize=0
             )
 

@@ -1,5 +1,5 @@
 """
-FmWk/core/decorators.py — Lightweight @mcp_tool Decorator and In-Process Registry
+MCP/core/decorators.py — Lightweight @mcp_tool Decorator and In-Process Registry
 """
 
 import inspect

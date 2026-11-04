@@ -1,5 +1,5 @@
 """
-FmWk/tools/device_tools.py — Hardware, Battery, and Display Controls
+MCP/tools/device_tools.py — Hardware, Battery, and Display Controls
 """
 
 from typing import Dict, Any

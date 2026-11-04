@@ -1,1 +1,10 @@
-__pycache__
+__pycache__/
+*.py[cod]
+.env
+.env.*
+credentials.json
+token.json
+client_secret*.json
+*.key
+*.pem
+mcp_servers.json

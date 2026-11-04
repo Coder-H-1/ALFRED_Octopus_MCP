@@ -1,5 +1,5 @@
 """
-FmWk/tools/__init__.py — Auto-loader for Native In-Process Tools
+MCP/tools/__init__.py — Auto-loader for Native In-Process Tools
 """
 
 import os

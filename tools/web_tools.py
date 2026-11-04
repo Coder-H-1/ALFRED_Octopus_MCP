@@ -1,5 +1,5 @@
 """
-FmWk/tools/web_tools.py — Fast Native Web Search and Information Extraction Tools
+MCP/tools/web_tools.py — Fast Native Web Search and Information Extraction Tools
 """
 
 import urllib.parse

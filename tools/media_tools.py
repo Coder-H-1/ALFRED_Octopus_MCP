@@ -1,5 +1,5 @@
 """
-FmWk/tools/media_tools.py — Media Controls for YouTube, Spotify, and System Audio
+MCP/tools/media_tools.py — Media Controls for YouTube, Spotify, and System Audio
 """
 
 from typing import Dict, Any

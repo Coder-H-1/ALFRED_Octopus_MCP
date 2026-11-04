@@ -1,5 +1,5 @@
 """
-FmWk/bridge.py — Intermediary Sync-to-Async Bridge between ALFRED and Octopus MCP
+MCP/bridge.py — Intermediary Sync-to-Async Bridge between ALFRED and Octopus MCP
 
 Features:
 - Runs an isolated asyncio event loop in a background daemon thread.
@@ -26,7 +26,7 @@ from .core.client import StdioMCPClient
 from .core.decorators import LOCAL_TOOL_REGISTRY, get_local_tools, call_local_tool
 from .core.keyword_router import KeywordRouter
 from .core.qwen_classifier import QwenToolClassifier
-import FmWk.tools  # Trigger auto-registration of local tools
+import MCP.tools  # Trigger auto-registration of local tools
 
 
 class MCPBridge:
@@ -63,12 +63,16 @@ class MCPBridge:
             cmd = srv.get("command")
             args = srv.get("args", [])
             env = srv.get("env")
+            cwd = srv.get("cwd")
+            if cwd and not os.path.isdir(cwd):
+                continue
             if cmd:
                 self._external_clients[name] = StdioMCPClient(
                     name=name,
                     command=cmd,
                     args=args,
-                    env=env
+                    env=env,
+                    cwd=cwd
                 )
 
     def _build_tool_cache(self):
@@ -88,12 +92,15 @@ class MCPBridge:
                 external_tools = client.list_tools()
                 for t in external_tools:
                     tool_key = f"{client_name}__{t['name']}"
-                    self._tools_cache[tool_key] = {
+                    entry = {
                         "source": "external",
                         "client": client,
                         "raw_name": t["name"],
                         "schema": t
                     }
+                    self._tools_cache[tool_key] = entry
+                    if t["name"] not in self._tools_cache:
+                        self._tools_cache[t["name"]] = entry
             except Exception:
                 pass
 
@@ -128,7 +135,7 @@ class MCPBridge:
 
     def route_and_execute(self, query: str) -> Dict[str, Any]:
         """
-        Strategy B Pipeline:
+        Pipeline:
         1. Fast-path regex / keyword check (sub-1ms)
         2. If matched, call tool via bridge
         3. If no match or tool failure, cascade down to Qwen classifier / ALFRED LLM

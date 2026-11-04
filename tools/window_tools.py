@@ -1,5 +1,5 @@
 """
-FmWk/tools/window_tools.py — Native In-Process Window Management Tools
+MCP/tools/window_tools.py — Native In-Process Window Management Tools
 """
 
 from typing import Dict, Any, List
