@@ -88,9 +88,9 @@ def start_deep_research(topic: str, max_sites: int = 3) -> Dict[str, Any]:
             from ..bridge import get_bridge
             bridge = get_bridge()
 
-            # Call researcher stdio server tool
+            # Call researcher stdio server tool (allow up to 15m for multi-site LLM synthesis)
             tool_name = "researcher__deep_research" if "researcher__deep_research" in bridge._tools_cache else "deep_research"
-            res = bridge.call_tool(tool_name, {"topic": clean_topic, "max_sites": max_sites}, timeout=300.0)
+            res = bridge.call_tool(tool_name, {"topic": clean_topic, "max_sites": max_sites}, timeout=900.0)
 
             _ACTIVE_RESEARCH_JOBS[job_id] = {
                 "status": "completed",
@@ -176,3 +176,74 @@ def open_research_report(topic: Optional[str] = None, format_type: str = "html")
     webbrowser.open(f"file:///{target_file.replace(os.sep, '/')}")
     ext_label = "PDF report" if target_file.endswith(".pdf") else "interactive web view"
     return {"status": f"Opening the {ext_label} for you now, sir."}
+
+
+@mcp_tool(
+    name="terminate_research",
+    description="Terminates running background research jobs, stops research server processes, unloads model from RAM to free memory, and cleans temporary files.",
+    category="research"
+)
+def terminate_research(topic: Optional[str] = None) -> Dict[str, Any]:
+    """
+    Terminates active research, terminates MCP process tree, frees RAM,
+    and cleans topic temp files (or all temp files if topic is omitted).
+    """
+    global _ACTIVE_RESEARCH_JOBS, _COMPLETED_RESEARCH_NOTIFICATIONS
+    clean_topic = topic.strip().strip("'\"") if topic else None
+    if clean_topic and clean_topic.lower() in ("all", "everything", "*"):
+        clean_topic = None
+
+    # 1. Update job registry & notifications
+    if clean_topic:
+        job_id = f"research_{clean_topic.replace(' ', '_').lower()}"
+        if job_id in _ACTIVE_RESEARCH_JOBS:
+            _ACTIVE_RESEARCH_JOBS[job_id]["status"] = "cancelled"
+        _COMPLETED_RESEARCH_NOTIFICATIONS = [
+            n for n in _COMPLETED_RESEARCH_NOTIFICATIONS if clean_topic.lower() not in n.lower()
+        ]
+    else:
+        for job in _ACTIVE_RESEARCH_JOBS.values():
+            job["status"] = "cancelled"
+        _ACTIVE_RESEARCH_JOBS.clear()
+        _COMPLETED_RESEARCH_NOTIFICATIONS.clear()
+
+    # 2. Forcibly terminate external MCP client process tree to halt scraping & inference
+    try:
+        from ..bridge import get_bridge
+        bridge = get_bridge()
+        if "researcher" in bridge._external_clients:
+            bridge._external_clients["researcher"].terminate()
+            logger.info("Forcibly terminated external researcher MCP client process.")
+    except Exception as e:
+        logger.warning(f"Error terminating researcher MCP client process: {e}")
+
+    # 3. Free in-process model memory if resident
+    try:
+        from Researcher.llm_manager import unload_researcher_llm
+        unload_researcher_llm()
+    except Exception:
+        pass
+
+    import gc
+    gc.collect()
+
+    # 4. Clean Temp storage
+    try:
+        from Researcher.temp_manager import cleanup_topic_temp, cleanup_all_temp_storage
+        if clean_topic:
+            cleanup_topic_temp(clean_topic)
+        else:
+            cleanup_all_temp_storage()
+    except Exception as e:
+        logger.warning(f"Error cleaning research temp storage: {e}")
+
+    if clean_topic:
+        status_speech = f"Sir, the background research on '{clean_topic}' has been terminated, memory freed, and temporary files cleaned."
+    else:
+        status_speech = "Sir, all background research tasks have been terminated, model memory freed, and temporary files cleaned."
+
+    logger.info(f"[Research Termination] {status_speech}")
+    return {
+        "status": status_speech,
+        "keep_ui": True
+    }

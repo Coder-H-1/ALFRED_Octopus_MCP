@@ -12,15 +12,20 @@ Octopus MCP is the pluggable tool execution engine for **ALFRED**, implementing 
    - Keeps ALFRED synchronous, fast, and free of async loop complications.
 
 2. **Dual-Mode Routing**:
-   - **Step 1 (Fast-Path)**: Sub-1ms regex & keyword router checks obvious tool intents (`volume`, `search`, `open app`).
+   - **Step 1 (Fast-Path)**: Sub-1ms regex & keyword router checks obvious tool intents (`volume`, `search`, `open app`, `research`, `cancel research`).
    - **Step 2 (Quantized Classifier)**: Optional Qwen 4-bit / TurboQuant classifier (<30ms latency) for speech argument parsing.
    - **Step 3 (Graceful Fallback)**: If no tool matches or if a tool fails, returns `{"handled": False}`, cascading query to ALFRED's main LLM.
 
 3. **Subprocess Pooling & Active Memory Management**:
    - External GitHub MCP servers run over **stdio** (Node.js / Python).
    - Injected Node memory cap: `--max-old-space-size=64`.
-   - **60-Second Idle Retirement**: Automatically terminates idle child processes and invokes `gc.collect()` to return RAM to the OS.
-   - **orjson Serialization**: Lightning-fast JSON-RPC 2.0 communication.
+   - **Non-blocking Stderr Draining**: Background worker thread continuously drains child stderr pipes, preventing OS kernel pipe buffer deadlocks.
+   - **Active Call Guarded Watchdog**: Subprocess idle watchdog respects in-flight tool executions, retiring processes safely after inactivity.
+   - **orjson Serialization**: High-throughput JSON-RPC 2.0 communication.
+
+4. **Deep Research & Job Control**:
+   - Background deep research jobs with extended execution window (up to 15m) for multi-site synthesis.
+   - Instant termination capability (`terminate_research`) with process tree termination, LLM RAM unloading, and automated temporary artifact purging.
 
 ---
 
@@ -31,14 +36,22 @@ MCP/
 ├── bridge.py              # Intermediary Sync-Async Bridge for ALFRED
 ├── mcp_servers.json       # Config registry for external GitHub stdio servers
 ├── core/
-│   ├── client.py          # Fast orjson Stdio MCP Client with memory caps & idle timer
+│   ├── client.py          # Fast orjson Stdio MCP Client with memory caps & stderr draining
 │   ├── config.py          # Configuration and path management
 │   ├── decorators.py      # @mcp_tool decorator for native in-process tools
-│   ├── keyword_router.py  # Regex fast-path matcher
+│   ├── keyword_router.py  # Regex fast-path matcher with job cancellation rules
 │   └── qwen_classifier.py # Qwen 4-bit quantized classifier interface
-├── tools/                 # Native in-process Python tools (<0.5ms)
-│   ├── system_tools.py    # Volume and application launcher
-│   └── web_tools.py       # DuckDuckGo search tool
+├── tools/                 # Native in-process Python tools
+│   ├── device_tools.py    # Screen brightness & hardware controls
+│   ├── email_tools.py     # OAuth2 Gmail query & inspection tools
+│   ├── gui_tools.py       # Assistant state & HUD controls
+│   ├── media_tools.py     # Audio ducking and media controls
+│   ├── research_tools.py  # Deep research dispatch, report viewer & job termination
+│   ├── resource_tools.py  # CPU/RAM system metric reporting
+│   ├── system_tools.py    # Volume, power, and app lifecycle
+│   ├── web_tools.py       # DuckDuckGo search integration
+│   ├── window_tools.py    # Window manager and placement
+│   └── youtube_tools.py   # YouTube search & video playback
 └── README.md
 ```
 
@@ -60,4 +73,4 @@ Open `MCP/mcp_servers.json` and add your tool definition under `mcpServers`:
 }
 ```
 
-The bridge automatically discovers schemas, enforces memory limits, runs the tool on demand, and retires the process after 60 seconds of inactivity.
+The bridge automatically discovers schemas, enforces memory limits, runs the tool on demand, and retires the process after inactivity.

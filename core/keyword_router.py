@@ -312,7 +312,24 @@ class KeywordRouter:
             lambda m: {}
         )
 
-        # 9. Application Closer
+        # 9. Deep Research Cancellation & Termination (Higher priority than general app_close)
+        def extract_cancel_topic(m: re.Match) -> dict:
+            try:
+                raw = m.group(1).strip() if m.lastindex and m.group(1) else ""
+                clean = re.sub(r"^(?:on|about|regarding)\s+", "", raw, flags=re.IGNORECASE).strip()
+                if clean:
+                    return {"topic": clean}
+            except Exception:
+                pass
+            return {}
+
+        self.register_rule(
+            r"(?:cancel|terminate|stop|abort|kill|clear)\s+(?:all\s+)?(?:the\s+)?(?:background\s+)?(?:deep\s+)?research(?:es)?(?:\s+(?:on|about|regarding)?\s*(.+))?",
+            "terminate_research",
+            extract_cancel_topic
+        )
+
+        # 10. Application Closer
         def extract_close_app(m: re.Match) -> Dict[str, Any]:
             return {"app_name": m.group(1).strip()}
 
@@ -322,7 +339,7 @@ class KeywordRouter:
             extract_close_app
         )
 
-        # 9. Gmail / Email Controls
+        # 11. Gmail / Email Controls
         self.register_rule(
             r"(?:check|list|get|show|read)\s+(?:my\s+)?(?:emails?|messages?|inbox|mail|gmail)",
             "list_messages",
@@ -334,7 +351,7 @@ class KeywordRouter:
             lambda m: {"maxResults": 5}
         )
 
-        # 10. Deep Research Controls
+        # 12. Deep Research Controls
         def extract_research_topic(m: re.Match) -> dict:
             raw = m.group(1).strip()
             clean = re.sub(r"^(?:on|about|regarding)\s+", "", raw, flags=re.IGNORECASE).strip()

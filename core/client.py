@@ -1,5 +1,5 @@
 """
-MCP/core/client.py — High-Performance Stdio MCP Client with orjson and Memory Management
+MCP/core/client.py — High-Performance Stdio MCP Client with orjson, Memory Management, and Non-blocking Stderr Draining
 """
 
 import os
@@ -8,6 +8,8 @@ import gc
 import time
 import subprocess
 import threading
+from typing import Optional, List, Dict, Any
+
 try:
     import orjson
 except ImportError:
@@ -22,6 +24,9 @@ except ImportError:
     orjson = _OrjsonCompat()
 
 from .config import get_settings
+from FILES.logger import get_logger
+
+logger = get_logger("MCP.StdioClient")
 
 
 class StdioMCPClient:
@@ -31,6 +36,7 @@ class StdioMCPClient:
     - orjson serialization for ultra-fast JSON-RPC
     - Automatic Node.js memory limits (--max-old-space-size=64)
     - Subprocess lifecycle management with idle termination (default 60s)
+    - Continuous stderr draining thread to prevent OS kernel pipe buffer deadlocks
     - gc.collect() on process retirement
     """
 
@@ -47,11 +53,13 @@ class StdioMCPClient:
         self.aggressive_gc = settings.get("aggressive_gc", True)
 
         self._process: Optional[subprocess.Popen] = None
-        self._lock = threading.Lock()
+        self._lock = threading.RLock()
         self._last_used: float = 0.0
         self._request_id = 0
         self._cached_tools: List[Dict[str, Any]] = []
         self._watchdog_timer: Optional[threading.Timer] = None
+        self._stderr_thread: Optional[threading.Thread] = None
+        self._active_calls: int = 0
 
     def _prepare_command_args(self) -> List[str]:
         """Injects Node.js memory caps if command is node or npx."""
@@ -73,8 +81,27 @@ class StdioMCPClient:
         executable = shutil.which(self.base_command) or self.base_command
         return [executable] + args
 
+    def _drain_stderr(self, proc: subprocess.Popen):
+        """Continuously reads proc.stderr to prevent OS pipe buffer deadlocks."""
+        try:
+            for raw_line in iter(proc.stderr.readline, b""):
+                if not raw_line:
+                    break
+                line = raw_line.decode("utf-8", errors="replace").rstrip()
+                if line:
+                    if "[ERROR]" in line:
+                        logger.error(f"[{self.name} stderr] {line}")
+                    elif "[WARNING]" in line:
+                        logger.warning(f"[{self.name} stderr] {line}")
+                    elif "[INFO]" in line or f"[{self.name}." in line.lower() or "researcher" in line.lower():
+                        logger.info(f"[{self.name} stderr] {line}")
+                    else:
+                        logger.debug(f"[{self.name} stderr] {line}")
+        except Exception:
+            pass
+
     def _ensure_process(self) -> subprocess.Popen:
-        """Spawns the child process if not running, and completes handshake."""
+        """Spawns the child process if not running, drains stderr, and completes handshake."""
         with self._lock:
             if self._process is not None and self._process.poll() is None:
                 self._reset_idle_watchdog()
@@ -90,6 +117,15 @@ class StdioMCPClient:
                 cwd=self.cwd,
                 bufsize=0
             )
+
+            # Launch background thread to drain stderr pipe and prevent buffer deadlocks
+            self._stderr_thread = threading.Thread(
+                target=self._drain_stderr,
+                args=(self._process,),
+                daemon=True,
+                name=f"MCP-StderrDrainer-{self.name}"
+            )
+            self._stderr_thread.start()
 
             # Perform MCP Handshake
             self._send_handshake()
@@ -108,9 +144,14 @@ class StdioMCPClient:
             self._watchdog_timer.start()
 
     def _check_idle_and_retire(self):
-        """Terminates subprocess if idle for longer than idle_timeout."""
+        """Terminates subprocess if idle for longer than idle_timeout and no active calls."""
         with self._lock:
             if self._process is None:
+                return
+
+            if self._active_calls > 0:
+                # Do not retire while calls are actively processing
+                self._reset_idle_watchdog()
                 return
 
             idle_duration = time.time() - self._last_used
@@ -118,22 +159,32 @@ class StdioMCPClient:
                 self.terminate()
 
     def terminate(self):
-        """Kills the running subprocess and runs garbage collection."""
+        """Kills the running subprocess tree and runs garbage collection."""
         with self._lock:
             if self._watchdog_timer:
                 self._watchdog_timer.cancel()
                 self._watchdog_timer = None
 
             if self._process is not None:
+                proc = self._process
+                self._process = None
                 try:
-                    self._process.terminate()
-                    self._process.wait(timeout=2.0)
+                    if sys.platform == "win32":
+                        # Terminate full process tree on Windows to clean up child python.exe processes
+                        subprocess.run(
+                            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+                            stdout=subprocess.DEVNULL,
+                            stderr=subprocess.DEVNULL,
+                            timeout=3.0
+                        )
+                    else:
+                        proc.terminate()
+                        proc.wait(timeout=2.0)
                 except Exception:
                     try:
-                        self._process.kill()
+                        proc.kill()
                     except Exception:
                         pass
-                self._process = None
 
             if self.aggressive_gc:
                 gc.collect()
@@ -195,24 +246,33 @@ class StdioMCPClient:
         return []
 
     def call_tool(self, name: str, arguments: Dict[str, Any], timeout: float = 10.0) -> Dict[str, Any]:
-        """Executes a tool on the external MCP server."""
-        self._ensure_process()
-        self._request_id += 1
-        req = {
-            "jsonrpc": "2.0",
-            "id": self._request_id,
-            "method": "tools/call",
-            "params": {
-                "name": name,
-                "arguments": arguments
-            }
-        }
-        self._send_raw(req)
-        resp = self._read_raw(timeout=timeout)
-        self._reset_idle_watchdog()
+        """Executes a tool on the external MCP server with busy-state tracking."""
+        with self._lock:
+            self._active_calls += 1
+            if self._watchdog_timer:
+                self._watchdog_timer.cancel()
 
-        if not resp:
-            return {"success": False, "error": f"Tool '{name}' timed out or server failed."}
-        if "error" in resp:
-            return {"success": False, "error": resp["error"]}
-        return {"success": True, "result": resp.get("result", {})}
+        try:
+            self._ensure_process()
+            self._request_id += 1
+            req = {
+                "jsonrpc": "2.0",
+                "id": self._request_id,
+                "method": "tools/call",
+                "params": {
+                    "name": name,
+                    "arguments": arguments
+                }
+            }
+            self._send_raw(req)
+            resp = self._read_raw(timeout=timeout)
+
+            if not resp:
+                return {"success": False, "error": f"Tool '{name}' timed out or server failed."}
+            if "error" in resp:
+                return {"success": False, "error": resp["error"]}
+            return {"success": True, "result": resp.get("result", {})}
+        finally:
+            with self._lock:
+                self._active_calls = max(0, self._active_calls - 1)
+                self._reset_idle_watchdog()
