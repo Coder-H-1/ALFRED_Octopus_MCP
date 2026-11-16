@@ -12,6 +12,11 @@ from comtypes import CLSCTX_ALL
 from pycaw.pycaw import AudioUtilities, IAudioEndpointVolume
 from ..core.decorators import mcp_tool
 
+PROTECTED_PROCESSES = {
+    "explorer.exe", "lsass.exe", "csrss.exe", "smss.exe", "services.exe",
+    "svchost.exe", "wininit.exe", "winlogon.exe", "system", "idle"
+}
+
 APP_MAP = {
     # System & utilities
     "notepad": "notepad.exe",
@@ -161,6 +166,9 @@ def mute_volume(mute_state: Optional[bool] = None) -> Dict[str, Any]:
 def open_app(app_name: str) -> Dict[str, Any]:
     """Launches application executable or mapped shortcut."""
     clean_name = app_name.lower().strip()
+    if any(char in clean_name for char in (";", "&", "|", "<", ">", "`", "%")):
+        return {"error": "Invalid characters in application name."}
+
     if clean_name in APP_MAP:
         cmd = APP_MAP[clean_name]
     else:
@@ -182,6 +190,8 @@ def close_app(app_name: str) -> Dict[str, Any]:
     """Closes process corresponding to app name."""
     clean_name = app_name.lower().strip()
     proc_name = CLOSE_PROCESS_MAP.get(clean_name, clean_name if clean_name.endswith(".exe") else f"{clean_name}.exe")
+    if proc_name.lower() in PROTECTED_PROCESSES:
+        return {"error": f"Refusing to terminate critical system process '{proc_name}'."}
     try:
         subprocess.Popen(f"taskkill /f /im {proc_name}", shell=True)
         return {"status": f"Closed {app_name}, sir."}
